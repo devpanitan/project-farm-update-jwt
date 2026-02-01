@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('farms', function (Blueprint $table) {
+        Schema::create('auto_rules', function (Blueprint $table) {
             $table->id();
-            $table->string('farm_name');
-            $table->text('description')->nullable();
-            $table->foreignId('farm_category_id')->constrained('farm_category');
-            $table->decimal('latitude', 10, 8)->nullable();
-            $table->decimal('longitude', 11, 8)->nullable();
+            $table->foreignId('iot_device_id')->constrained('iot_devices');
+            $table->foreignId('actuator_id')->constrained('actuator_commands');
+            $table->string('description')->nullable();
+            $table->integer('activate_interval')->nullable()->comment('Activation interval in seconds');
             $table->timestamps();
             $table->softDeletes();
         });
@@ -28,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('farms');
+        Schema::dropIfExists('auto_rules');
     }
 };

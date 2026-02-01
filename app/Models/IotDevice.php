@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class IotDevice extends Model
 {
@@ -17,7 +17,7 @@ class IotDevice extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'uuid',
+        'uuid', // Although it will be auto-generated, it's good to have it here
         'farm_id',
         'description',
         'status',
@@ -25,10 +25,36 @@ class IotDevice extends Model
     ];
 
     /**
-     * Get the farm that owns the IoT device.
+     * The "booting" method of the model.
+     *
+     * @return void
      */
-    public function farm(): BelongsTo
+    protected static function boot()
     {
-        return $this->belongsTo(Farm::class);
+        parent::boot();
+
+        // Register a creating event to auto-generate UUID
+        static::creating(function ($model) {
+            // Prevent overwriting if UUID is already set
+            if (empty($model->uuid)) {
+                $model->uuid = (string) Str::uuid();
+            }
+        });
+    }
+
+    /**
+     * Get the farm that this device belongs to.
+     */
+    public function farm()
+    {
+        return $this->belongsTo(Farm::class, 'farm_id');
+    }
+
+    /**
+     * Get the sensor data for the IoT device.
+     */
+    public function sensorData()
+    {
+        return $this->hasMany(SensorData::class, 'uuid', 'uuid');
     }
 }

@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FarmCategory; // Use the new FarmCategory model
+use App\Models\FarmCategory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class FarmCategoryController extends Controller
 {
@@ -24,15 +25,15 @@ class FarmCategoryController extends Controller
      */
     public function store(Request $request)
     {
-        // Debug line removed. Ready for normal operation.
-
-        $request->validate([
-            'cat_name' => 'required|string|max:255',
+        $validator = Validator::make($request->all(), [
+            'cat_name' => 'required|string|max:255|unique:farm_category,cat_name',
         ]);
 
-        $category = FarmCategory::create([
-            'cat_name' => $request->cat_name,
-        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        $category = FarmCategory::create($validator->validated());
 
         return response()->json([
             'status' => 'success',
@@ -44,43 +45,55 @@ class FarmCategoryController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show($id)
     {
-        $category = FarmCategory::findOrFail($id);
+        $farmCategory = FarmCategory::find($id);
+        if (!$farmCategory) {
+            return response()->json(['status' => 'error', 'message' => 'Category not found.'], 404);
+        }
         return response()->json([
             'status' => 'success',
-            'data' => $category
+            'data' => $farmCategory
         ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, $id)
     {
-        $request->validate([
-            'cat_name' => 'sometimes|required|string|max:255',
+        $farmCategory = FarmCategory::find($id);
+        if (!$farmCategory) {
+            return response()->json(['status' => 'error', 'message' => 'Category not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'cat_name' => 'sometimes|required|string|max:255|unique:farm_category,cat_name,' . $farmCategory->id,
         ]);
 
-        $category = FarmCategory::findOrFail($id);
-        $category->update([
-            'cat_name' => $request->cat_name,
-        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        $farmCategory->update($request->all());
 
         return response()->json([
             'status' => 'success',
             'message' => 'Category updated successfully.',
-            'data' => $category
+            'data' => $farmCategory
         ]);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        $category = FarmCategory::findOrFail($id);
-        $category->delete();
+        $farmCategory = FarmCategory::find($id);
+        if (!$farmCategory) {
+            return response()->json(['status' => 'error', 'message' => 'Category not found.'], 404);
+        }
+        $farmCategory->delete();
 
         return response()->json([
             'status' => 'success',

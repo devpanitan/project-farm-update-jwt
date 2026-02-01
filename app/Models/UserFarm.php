@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Farm extends Model
+class UserFarm extends Model
 {
     use HasFactory, SoftDeletes;
 
@@ -16,21 +16,23 @@ class Farm extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
-        'description',
-        'farm_cat_id',
-        'lat',
-        'lng',
-        'size',
-        'farm_prefix',
+        'user_id',
+        'farm_id',
     ];
 
     /**
-     * Get the category that this farm belongs to.
+     * Get the user that owns the farm.
      */
-    public function farmCategory()
+    public function user()
     {
-        // Use the correct foreign key 'farm_cat_id'
-        return $this->belongsTo(FarmCategory::class, 'farm_cat_id');
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the farm that the user owns.
+     */
+    public function farm()
+    {
+        return $this->belongsTo(Farm::class);
     }
 }
