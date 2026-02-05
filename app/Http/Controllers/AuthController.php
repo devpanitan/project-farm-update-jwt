@@ -50,6 +50,7 @@ class AuthController extends Controller
     {
         // Validator now correctly requires 'username' instead of 'name', matching the database.
         $validator = Validator::make($request->all(), [
+            'user_role_id' => 'required|integer',
             'username' => 'required|string|between:2,100|unique:users',
             'email' => 'required|string|email|max:100|unique:users',
             'password' => 'required|string|confirmed|min:6',
@@ -61,6 +62,7 @@ class AuthController extends Controller
 
         // The 'name' field has been removed from the creation process to match the database schema.
         $user = User::create([
+            'user_role_id' => $request->user_role_id,
             'username' => $request->username,
             'email' => $request->email,
             'password' => $request->password
