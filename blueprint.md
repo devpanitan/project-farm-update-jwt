@@ -1,29 +1,39 @@
+# Project Blueprint
 
-# Blueprint: User Catalog
+## 1. Overview
 
-## Overview
+This project is a full-stack web application for a Smart Farm system, built with Laravel. It's designed to manage users, farms, IoT devices, and sensor data, providing a platform for monitoring and controlling agricultural environments.
 
-This project is a Laravel application designed to display a catalog of users. It demonstrates basic data fetching and display using the MVC pattern.
+## 2. Implemented Features & Design
 
-## Project Outline
+### Backend (Laravel API)
 
-*   **Backend:** Laravel
-*   **Frontend:** Blade templates with Tailwind CSS (via Vite)
-*   **Features:**
-    *   **User Catalog Display:** A single page view located at `resources/views/user-cat/index.blade.php` designed to list users.
-*   **Styling:**
-    *   Utilizes Tailwind CSS for modern styling.
-    *   Base styles and imports are configured in `resources/css/app.css`.
-    *   The primary font is "Instrument Sans".
-    *   The overall theme is dark, with a `bg-gray-900` background and `text-white`.
+*   **Authentication:** JWT-based authentication for securing API endpoints.
+*   **User Management:** CRUD operations for users.
+*   **Farm Management:** CRUD operations for farms and farm categories.
+*   **IoT Device Management:** CRUD operations for IoT devices.
+*   **Sensor Data:** Handling and storage of sensor data.
+*   **Automation:** Rules-based automation for controlling actuators.
+*   **Real-time Communication:** MQTT integration for real-time device communication.
+*   **Logging:** Activity logging for tracking user actions.
+*   **API Structure:**
+    *   Public routes for authentication (`/api/auth/*`).
+    *   Protected routes for all other resources, requiring `auth:api` middleware.
 
-## Current Task: Implement User Catalog Logic
+### Frontend
 
-**Goal:** Make the User Catalog page functional by fetching users from the database and displaying them.
+*   _Not yet implemented._
 
-**Steps:**
+### Design
 
-1.  **Create `UserCatController`:** Generate a new controller to handle the request for the user catalog page.
-2.  **Fetch Data:** Inside the controller, add logic to retrieve all users from the `User` model.
-3.  **Create a Web Route:** Define a `GET` route in `routes/web.php` that maps the `/users` URL to the new controller method.
-4.  **Update the Blade View:** Modify `resources/views/user-cat/index.blade.php` to loop through the user data passed from the controller and display each user's name and email in a list or table.
+*   _Not yet implemented._
+
+## 3. Current Plan
+
+*   **Secure API Routes:** Group all relevant API endpoints under the `auth:api` middleware to ensure data is protected and accessible only by authenticated users. (Completed)
+*   **Standardize Activity Log Routes:** Refactor the `ActivityLogController` routes to use `apiResource` for consistency with other controllers. (Completed)
+*   **Develop Frontend UI:** Create a user interface to interact with the backend API.
+*   **Database Seeding:** Populate the database with initial data for development and testing.
+
+---
+*This document is automatically generated and updated by Gemini AI to reflect the current state of the project.*

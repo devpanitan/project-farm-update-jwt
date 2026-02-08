@@ -33,4 +33,12 @@ class Farm extends Model
         // Use the correct foreign key 'farm_cat_id'
         return $this->belongsTo(FarmCategory::class, 'farm_cat_id');
     }
+
+    /**
+     * The users that belong to the farm.
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'farm_user');
+    }
 }

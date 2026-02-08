@@ -60,6 +60,58 @@ class User extends Authenticatable implements JWTSubject
     ];
 
     /**
+     * Get the role of the user.
+     */
+    public function userRole()
+    {
+        return $this->belongsTo(UserRole::class, 'user_role_id');
+    }
+
+    /**
+     * The farms that the user belongs to.
+     */
+    public function farms()
+    {
+        return $this->belongsToMany(Farm::class, 'user_farms');
+    }
+
+    /**
+     * Check if the user is a Super Admin.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->user_role_id === 1;
+    }
+
+    /**
+     * Check if the user is a Farm Owner.
+     */
+    public function isFarmOwner(): bool
+    {
+        return $this->user_role_id === 2;
+    }
+
+    /**
+     * Check if the user is a Farm Worker.
+     */
+    public function isFarmWorker(): bool
+    {
+        return $this->user_role_id === 3;
+    }
+
+     /**
+     * Check if the user is the owner of a specific farm.
+     */
+    public function isOwnerOfFarm($farmId): bool
+    {
+        // A user is the owner of the farm if they are a Farm Owner AND are linked to that farm.
+        if (!$this->isFarmOwner()) {
+            return false;
+        }
+        return $this->farms()->where('farm_id', $farmId)->exists();
+    }
+
+    /**
      * Get the identifier that will be stored in the subject claim of the JWT.
      *
      * @return mixed

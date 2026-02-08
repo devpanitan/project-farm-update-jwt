@@ -3,25 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\Farm;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
 class FarmController extends Controller
 {
     /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        // Apply the 'auth:api' middleware to all methods in this controller.
+        $this->middleware('auth:api');
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $farms = Farm::with('farmCategory')->latest()->get();
+        $user = $request->user();
 
-        // Check if the request wants a JSON response (API call)
-        if ($request->expectsJson()) {
-            return response()->json(['status' => 'success', 'data' => $farms]);
+        // Super Admins can see all farms.
+        if ($user->can('isSuperAdmin')) {
+            $farms = Farm::with('farmCategory')->latest()->get();
+        } else {
+            // Other users see only the farms they are members of.
+            $farms = $user->farms()->with('farmCategory')->latest()->get();
         }
 
-        // Otherwise, return the web view with the farms data
-        return view('welcome', ['farms' => $farms]);
+        return response()->json(['status' => 'success', 'data' => $farms]);
     }
 
     /**
@@ -29,89 +42,87 @@ class FarmController extends Controller
      */
     public function store(Request $request)
     {
+        // Use the 'create' ability from FarmPolicy.
+        $this->authorize('create', Farm::class);
+
         $validator = Validator::make($request->all(), [
             'farm_name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'farm_category_id' => 'required|exists:farm_category,id',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'size' => 'nullable|numeric',
-            'farm_prefix' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $validatedData = $validator->validated();
+        $farm = Farm::create([
+            'name' => $request->farm_name,
+            'farm_cat_id' => $request->farm_category_id,
+            'description' => $request->description,
+        ]);
 
-        $farmData = [
-            'name' => $validatedData['farm_name'],
-            'farm_cat_id' => $validatedData['farm_category_id'],
-            'description' => $validatedData['description'] ?? null,
-            'lat' => $validatedData['latitude'] ?? null,
-            'lng' => $validatedData['longitude'] ?? null,
-            'size' => $validatedData['size'] ?? null,
-            'farm_prefix' => $validatedData['farm_prefix'] ?? null,
-        ];
-
-        $farm = Farm::create($farmData);
+        // Attach the farm to the user who created it.
+        $request->user()->farms()->attach($farm->id);
         
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => $request->user()->id,
+            'action'       => 'created_farm',
+            'subject_id'   => $farm->id,
+            'subject_type' => get_class($farm),
+            'description'  => "User '{$request->user()->username}' created farm '{$farm->name}'.",
+            'after'        => $farm->toArray(),
+        ]);
+        // --- End of Automatic Logging ---
+
         return response()->json(['status' => 'success', 'message' => 'Farm created successfully.', 'data' => $farm->load('farmCategory')], 201);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Request $request, $id)
+    public function show(Farm $farm)
     {
-        $farm = Farm::with('farmCategory')->find($id);
-        if (!$farm) {
-            return response()->json(['status' => 'error', 'message' => 'Farm not found.'], 404);
-        }
-        
-        // This is an API-only method, so it always returns JSON.
-        return response()->json(['status' => 'success', 'data' => $farm]);
+        // Use the 'view' ability from FarmPolicy.
+        $this->authorize('view', $farm);
+
+        return response()->json(['status' => 'success', 'data' => $farm->load('farmCategory')]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, Farm $farm)
     {
-        $farm = Farm::find($id);
-        if (!$farm) {
-            return response()->json(['status' => 'error', 'message' => 'Farm not found.'], 404);
-        }
+        // Use the 'update' ability from FarmPolicy.
+        $this->authorize('update', $farm);
 
         $validator = Validator::make($request->all(), [
             'farm_name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'farm_category_id' => 'sometimes|required|exists:farm_category,id',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'size' => 'nullable|numeric',
-            'farm_prefix' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $validatedData = $validator->validated();
-        
-        $farmData = [];
-        if (isset($validatedData['farm_name'])) $farmData['name'] = $validatedData['farm_name'];
-        if (isset($validatedData['farm_category_id'])) $farmData['farm_cat_id'] = $validatedData['farm_category_id'];
-        if (array_key_exists('description', $validatedData)) $farmData['description'] = $validatedData['description'];
-        if (isset($validatedData['latitude'])) $farmData['lat'] = $validatedData['latitude'];
-        if (isset($validatedData['longitude'])) $farmData['lng'] = $validatedData['longitude'];
-        if (isset($validatedData['size'])) $farmData['size'] = $validatedData['size'];
-        if (isset($validatedData['farm_prefix'])) $farmData['farm_prefix'] = $validatedData['farm_prefix'];
+        // --- Logging: Capture state BEFORE update ---
+        $beforeData = $farm->fresh()->toArray();
 
-        if (!empty($farmData)) {
-            $farm->update($farmData);
-        }
+        $farm->update($request->all());
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => $request->user()->id,
+            'action'       => 'updated_farm',
+            'subject_id'   => $farm->id,
+            'subject_type' => get_class($farm),
+            'description'  => "User '{$request->user()->username}' updated farm '{$farm->name}'.",
+            'before'       => $beforeData,
+            'after'        => $farm->fresh()->toArray(),
+        ]);
+        // --- End of Automatic Logging ---
 
         return response()->json(['status' => 'success', 'message' => 'Farm updated successfully.', 'data' => $farm->load('farmCategory')]);
     }
@@ -119,13 +130,27 @@ class FarmController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy($id)
+    public function destroy(Farm $farm)
     {
-        $farm = Farm::find($id);
-        if (!$farm) {
-            return response()->json(['status' => 'error', 'message' => 'Farm not found.'], 404);
-        }
+        // Use the 'delete' ability from FarmPolicy.
+        $this->authorize('delete', $farm);
+
+        // --- Logging: Capture state BEFORE deletion ---
+        $beforeData = $farm->toArray();
+
         $farm->delete();
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => request()->user()->id,
+            'action'       => 'deleted_farm',
+            'subject_id'   => $beforeData['id'],
+            'subject_type' => get_class($farm),
+            'description'  => "User '" . request()->user()->username . "' deleted farm '{$beforeData['name']}'.",
+            'before'       => $beforeData,
+        ]);
+        // --- End of Automatic Logging ---
+
         return response()->json(['status' => 'success', 'message' => 'Farm deleted successfully.']);
     }
 }

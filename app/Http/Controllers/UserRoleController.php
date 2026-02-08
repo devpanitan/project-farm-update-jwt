@@ -4,10 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Models\UserRole;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
 class UserRoleController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth:api');
+
+        $this->middleware(function ($request, $next) {
+            if (!Gate::allows('isSuperAdmin')) {
+                abort(403, 'Unauthorized action.');
+            }
+            return $next($request);
+        })->except(['index', 'show']); // Allow anyone authenticated to view roles
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -53,10 +69,13 @@ class UserRoleController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $userRole = UserRole::find($id);
-        if (!$userRole) {
-            return response()->json(['status' => 'error', 'message' => 'User role not found.'], 404);
+        // It's generally a bad idea to allow modification of core roles like Super Admin.
+        // We will prevent editing of the first 3 roles (Super Admin, Owner, Worker)
+        if ($id <= 3) {
+             return response()->json(['status' => 'error', 'message' => 'Updating core system roles is not permitted.'], 403);
         }
+
+        $userRole = UserRole::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
             'role_name' => 'sometimes|required|string|max:255|unique:user_roles,role_name,' . $userRole->id,
@@ -77,10 +96,12 @@ class UserRoleController extends Controller
      */
     public function destroy($id)
     {
-        $userRole = UserRole::find($id);
-        if (!$userRole) {
-            return response()->json(['status' => 'error', 'message' => 'User role not found.'], 404);
+        // Prevent deletion of core roles
+        if ($id <= 3) {
+             return response()->json(['status' => 'error', 'message' => 'Deleting core system roles is not permitted.'], 403);
         }
+
+        $userRole = UserRole::findOrFail($id);
         $userRole->delete();
         return response()->json(['status' => 'success', 'message' => 'User role deleted successfully.']);
     }

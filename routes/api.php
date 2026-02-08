@@ -15,6 +15,7 @@ use App\Http\Controllers\AutoRuleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\MQTTController;
+use App\Http\Controllers\Api\ActivityLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -27,45 +28,7 @@ use App\Http\Controllers\MQTTController;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
-
-// Route for the FarmCategory resource
-Route::apiResource('farm-categories', FarmCategoryController::class);
-
-// Route for the new Farm resource
-Route::apiResource('farms', FarmController::class);
-
-// Route for the new IotDevice resource
-Route::apiResource('iot-devices', IotDeviceController::class);
-
-// Route for the new ActuatorCommand resource
-Route::apiResource('actuator-commands', ActuatorCommandController::class);
-
-// Route for the new SensorType resource
-Route::apiResource('sensor-types', SensorTypeController::class);
-
-// Route for the new UserRole resource
-Route::apiResource('user-roles', UserRoleController::class);
-
-// Route for the new SensorData resource
-Route::apiResource('sensor-data', SensorDataController::class);
-
-// Main User resource for registration and auth checking
-Route::apiResource('users', UsersController::class);
-
-// Route for the new UserFarm resource
-Route::apiResource('user-farms', UserFarmController::class);
-
-// Route for the new AutoRule resource
-Route::apiResource('auto-rules', AutoRuleController::class);
-
-// Route for the new MQTT resource
-Route::apiResource('mqtt', MQTTController::class);
-Route::post('/mqtt/publish', [MQTTController::class, 'publishMessage']);
-
-
+// Authentication routes (Public)
 Route::group([
     'middleware' => 'api',
     'prefix' => 'auth'
@@ -75,4 +38,30 @@ Route::group([
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::post('me', [AuthController::class, 'me']);
+});
+
+// Protected API routes (Requires Authentication)
+Route::group(['middleware' => 'auth:api'], function () {
+
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+
+    // Resource routes
+    Route::apiResource('farm-categories', FarmCategoryController::class);
+    Route::apiResource('farms', FarmController::class);
+    Route::apiResource('iot-devices', IotDeviceController::class);
+    Route::apiResource('actuator-commands', ActuatorCommandController::class);
+    Route::apiResource('sensor-types', SensorTypeController::class);
+    Route::apiResource('user-roles', UserRoleController::class);
+    Route::apiResource('sensor-data', SensorDataController::class);
+    Route::apiResource('users', UsersController::class);
+    Route::apiResource('user-farms', UserFarmController::class);
+    Route::apiResource('auto-rules', AutoRuleController::class);
+    Route::apiResource('mqtt', MQTTController::class);
+    Route::apiResource('activity-logs', ActivityLogController::class)->only(['index', 'store']);
+
+    // Custom routes
+    Route::get('users/{id}/farms', [UsersController::class, 'showFarms']);
+    Route::post('/mqtt/publish', [MQTTController::class, 'publishMessage']);
 });

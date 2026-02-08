@@ -4,11 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\SensorType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class SensorTypeController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth:api');
+
+        $this->middleware(function ($request, $next) {
+            if (!Gate::allows('isSuperAdmin')) {
+                abort(403, 'Unauthorized action.');
+            }
+            return $next($request);
+        })->only(['store', 'update', 'destroy']);
+    }
+
     /**
      * Display a listing of the resource.
      */

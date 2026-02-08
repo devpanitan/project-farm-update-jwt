@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\AutoRule;
 use App\Models\ActuatorCommand;
+use App\Models\IotDevice;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -11,14 +13,30 @@ use Illuminate\Support\Facades\Validator;
 class AutoRuleController extends Controller
 {
     /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth:api');
+    }
+
+    /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json([
-            'status' => 'success',
-            'data' => AutoRule::with('iotDevice', 'actuator')->get(),
-        ]);
+        $this->authorize('viewAny', AutoRule::class);
+        
+        $user = $request->user();
+        $farmIds = $user->farms()->pluck('id');
+        $deviceIds = IotDevice::whereIn('farm_id', $farmIds)->pluck('id');
+
+        $rules = AutoRule::with(['iotDevice', 'actuator'])
+            ->whereIn('iot_device_id', $deviceIds)
+            ->latest()
+            ->paginate(50);
+
+        return response()->json(['status' => 'success', 'data' => $rules]);
     }
 
     /**
@@ -26,6 +44,8 @@ class AutoRuleController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', AutoRule::class);
+
         $validator = Validator::make($request->all(), [
             'iot_device_id' => 'required|exists:iot_devices,id',
             'actuator_id' => [
@@ -52,23 +72,20 @@ class AutoRuleController extends Controller
 
         $validatedData = $validator->validated();
 
+        $device = IotDevice::findOrFail($validatedData['iot_device_id']);
+        $this->authorize('update', $device);
+
+        $autoRule = null; // Initialize to null
+
         try {
             DB::beginTransaction();
 
-            // 1. Create the AutoRule
             $autoRule = AutoRule::create($validatedData);
-
-            // 2. Update the ActuatorCommand with the new auto_rule_id
             $actuator = ActuatorCommand::find($validatedData['actuator_id']);
             $actuator->auto_rule_id = $autoRule->id;
             $actuator->save();
 
             DB::commit();
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $autoRule->load('iotDevice', 'actuator'),
-            ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -78,6 +95,24 @@ class AutoRuleController extends Controller
                 'error_details' => $e->getMessage()
             ], 500);
         }
+
+        // --- Start of Automatic Logging (after successful transaction) ---
+        if ($autoRule) {
+            ActivityLog::create([
+                'user_id'      => $request->user()->id,
+                'action'       => 'created_auto_rule',
+                'subject_id'   => $autoRule->id,
+                'subject_type' => get_class($autoRule),
+                'description'  => "User '{$request->user()->username}' created a new auto rule: '{$autoRule->description}'.",
+                'after'        => $autoRule->load('iotDevice', 'actuator')->toArray(),
+            ]);
+        }
+        // --- End of Automatic Logging ---
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $autoRule->load('iotDevice', 'actuator'),
+        ], 201);
     }
 
     /**
@@ -85,6 +120,7 @@ class AutoRuleController extends Controller
      */
     public function show(AutoRule $autoRule)
     {
+        $this->authorize('view', $autoRule);
         return response()->json([
             'status' => 'success',
             'data' => $autoRule->load('iotDevice', 'actuator'),
@@ -96,6 +132,8 @@ class AutoRuleController extends Controller
      */
     public function update(Request $request, AutoRule $autoRule)
     {
+        $this->authorize('update', $autoRule);
+
         $validator = Validator::make($request->all(), [
             'iot_device_id' => 'sometimes|required|exists:iot_devices,id',
             'actuator_id' => [
@@ -122,6 +160,7 @@ class AutoRuleController extends Controller
         }
         
         $validatedData = $validator->validated();
+        $beforeData = $autoRule->fresh()->load('iotDevice', 'actuator')->toArray();
 
         try {
             DB::beginTransaction();
@@ -129,7 +168,6 @@ class AutoRuleController extends Controller
             $originalActuatorId = $autoRule->actuator_id;
             $newActuatorId = $validatedData['actuator_id'] ?? $originalActuatorId;
 
-            // If actuator is being changed, release the old one
             if ($originalActuatorId !== $newActuatorId) {
                 $oldActuator = ActuatorCommand::find($originalActuatorId);
                 if ($oldActuator) {
@@ -138,10 +176,8 @@ class AutoRuleController extends Controller
                 }
             }
             
-            // Update the AutoRule itself
             $autoRule->update($validatedData);
 
-            // Link the new actuator
             $newActuator = ActuatorCommand::find($newActuatorId);
             if ($newActuator) {
                 $newActuator->auto_rule_id = $autoRule->id;
@@ -150,11 +186,6 @@ class AutoRuleController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $autoRule->fresh()->load('iotDevice', 'actuator'),
-            ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
@@ -163,6 +194,23 @@ class AutoRuleController extends Controller
                 'error_details' => $e->getMessage()
             ], 500);
         }
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => $request->user()->id,
+            'action'       => 'updated_auto_rule',
+            'subject_id'   => $autoRule->id,
+            'subject_type' => get_class($autoRule),
+            'description'  => "User '{$request->user()->username}' updated an auto rule: '{$autoRule->description}'.",
+            'before'       => $beforeData,
+            'after'        => $autoRule->fresh()->load('iotDevice', 'actuator')->toArray(),
+        ]);
+        // --- End of Automatic Logging ---
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $autoRule->fresh()->load('iotDevice', 'actuator'),
+        ]);
     }
 
     /**
@@ -170,25 +218,22 @@ class AutoRuleController extends Controller
      */
     public function destroy(AutoRule $autoRule)
     {
+        $this->authorize('delete', $autoRule);
+        
+        $beforeData = $autoRule->load('iotDevice', 'actuator')->toArray();
+
         try {
             DB::beginTransaction();
 
-            // 1. Find the associated actuator and release it
             $actuator = ActuatorCommand::find($autoRule->actuator_id);
             if ($actuator) {
                 $actuator->auto_rule_id = null;
                 $actuator->save();
             }
 
-            // 2. Delete the auto rule
             $autoRule->delete();
 
             DB::commit();
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'AutoRule and its associations have been successfully soft deleted.',
-            ], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -198,5 +243,21 @@ class AutoRuleController extends Controller
                 'error_details' => $e->getMessage()
             ], 500);
         }
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => request()->user()->id,
+            'action'       => 'deleted_auto_rule',
+            'subject_id'   => $beforeData['id'],
+            'subject_type' => get_class($autoRule),
+            'description'  => "User '" . request()->user()->username . "' deleted an auto rule: '{$beforeData['description']}'.",
+            'before'       => $beforeData,
+        ]);
+        // --- End of Automatic Logging ---
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'AutoRule and its associations have been successfully soft deleted.',
+        ], 200);
     }
 }

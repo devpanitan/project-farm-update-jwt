@@ -3,24 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Models\IotDevice;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use App\Models\Farm;
 
 class IotDeviceController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth:api');
+    }
+
+    /**
+     * Display a listing of the resource for the user's farms.
      */
     public function index(Request $request)
     {
-        $query = IotDevice::with('farm');
+        $user = $request->user();
+        $this->authorize('viewAny', IotDevice::class);
 
-        if ($request->has('farm_id')) {
-            $query->where('farm_id', $request->input('farm_id'));
-        }
+        // Instead of allowing any farm_id, we get devices from the farms the user is a member of.
+        $farmIds = $user->farms()->pluck('id');
+        $devices = IotDevice::with('farm')->whereIn('farm_id', $farmIds)->latest()->get();
 
-        $devices = $query->latest()->get();
         return response()->json(['status' => 'success', 'data' => $devices]);
     }
 
@@ -29,6 +39,8 @@ class IotDeviceController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', IotDevice::class);
+
         $validator = Validator::make($request->all(), [
             'farm_id' => ['required', 'integer', Rule::exists('farms', 'id')],
             'description' => 'nullable|string',
@@ -40,37 +52,42 @@ class IotDeviceController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        // UUID is generated automatically by the model event
+        // Additionally, check if the user can create a device in this specific farm.
+        $farm = Farm::findOrFail($request->farm_id);
+        $this->authorize('update', $farm); // Creating a device is like updating a farm.
+
         $device = IotDevice::create($validator->validated());
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => $request->user()->id,
+            'action'       => 'created_iot_device',
+            'subject_id'   => $device->id,
+            'subject_type' => get_class($device),
+            'description'  => "User '{$request->user()->username}' created a new device.",
+            'after'        => $device->toArray(),
+        ]);
+        // --- End of Automatic Logging ---
+
         return response()->json(['status' => 'success', 'message' => 'IoT device created successfully.', 'data' => $device->load('farm')], 201);
     }
 
     /**
      * Display the specified resource.
-     * Can be found by either id or uuid.
      */
-    public function show($id)
+    public function show(IotDevice $iotDevice)
     {
-        $device = IotDevice::with('farm')
-            ->where('id', $id)
-            ->orWhere('uuid', $id)
-            ->first();
+        $this->authorize('view', $iotDevice);
 
-        if (!$device) {
-            return response()->json(['status' => 'error', 'message' => 'IoT device not found.'], 404);
-        }
-        return response()->json(['status' => 'success', 'data' => $device]);
+        return response()->json(['status' => 'success', 'data' => $iotDevice->load('farm')]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, IotDevice $iotDevice)
     {
-        $device = IotDevice::where('id', $id)->orWhere('uuid', $id)->first();
-        if (!$device) {
-            return response()->json(['status' => 'error', 'message' => 'IoT device not found.'], 404);
-        }
+        $this->authorize('update', $iotDevice);
 
         $validator = Validator::make($request->all(), [
             'farm_id' => ['sometimes', 'required', 'integer', Rule::exists('farms', 'id')],
@@ -83,20 +100,33 @@ class IotDeviceController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $device->update($validator->validated());
-        return response()->json(['status' => 'success', 'message' => 'IoT device updated successfully.', 'data' => $device->load('farm')]);
+        $iotDevice->update($validator->validated());
+        return response()->json(['status' => 'success', 'message' => 'IoT device updated successfully.', 'data' => $iotDevice->load('farm')]);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy($id)
+    public function destroy(IotDevice $iotDevice)
     {
-        $device = IotDevice::where('id', $id)->orWhere('uuid', $id)->first();
-        if (!$device) {
-            return response()->json(['status' => 'error', 'message' => 'IoT device not found.'], 404);
-        }
-        $device->delete();
+        $this->authorize('delete', $iotDevice);
+
+        // --- Logging: Capture state BEFORE deletion ---
+        $beforeData = $iotDevice->toArray();
+
+        $iotDevice->delete();
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => request()->user()->id,
+            'action'       => 'deleted_iot_device',
+            'subject_id'   => $beforeData['id'],
+            'subject_type' => get_class($iotDevice),
+            'description'  => "User '" . request()->user()->username . "' deleted device with UUID '{$beforeData['uuid']}'.",
+            'before'       => $beforeData,
+        ]);
+        // --- End of Automatic Logging ---
+
         return response()->json(['status' => 'success', 'message' => 'IoT device deleted successfully.']);
     }
 }

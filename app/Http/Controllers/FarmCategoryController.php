@@ -4,12 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Models\FarmCategory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
 class FarmCategoryController extends Controller
 {
     /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        // 1. Protect all methods with auth:api middleware for authentication
+        $this->middleware('auth:api');
+
+        // 2. Authorize write actions (store, update, destroy) for Super Admins only
+        // We use the 'can' middleware with the Gate we defined earlier.
+        // This will automatically check if Gate::allows('isSuperAdmin') returns true.
+        $this->middleware(function ($request, $next) {
+            if (!Gate::allows('isSuperAdmin')) {
+                abort(403, 'Unauthorized action.');
+            }
+            return $next($request);
+        })->only(['store', 'update', 'destroy']);
+    }
+
+    /**
      * Display a listing of the resource.
+     * Accessible to any authenticated user.
      */
     public function index()
     {
@@ -22,6 +43,7 @@ class FarmCategoryController extends Controller
 
     /**
      * Store a newly created resource in storage.
+     * Super Admins only.
      */
     public function store(Request $request)
     {
@@ -44,6 +66,7 @@ class FarmCategoryController extends Controller
 
     /**
      * Display the specified resource.
+     * Accessible to any authenticated user.
      */
     public function show($id)
     {
@@ -59,6 +82,7 @@ class FarmCategoryController extends Controller
 
     /**
      * Update the specified resource in storage.
+     * Super Admins only.
      */
     public function update(Request $request, $id)
     {
@@ -86,6 +110,7 @@ class FarmCategoryController extends Controller
 
     /**
      * Remove the specified resource from storage.
+     * Super Admins only.
      */
     public function destroy($id)
     {

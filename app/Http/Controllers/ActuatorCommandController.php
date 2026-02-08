@@ -3,20 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActuatorCommand;
+use App\Models\IotDevice;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class ActuatorCommandController extends Controller
 {
     /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth:api');
+    }
+
+    /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json([
-            'status' => 'success',
-            'data' => ActuatorCommand::with('iotDevice')->get(),
-        ]);
+        $this->authorize('viewAny', ActuatorCommand::class);
+
+        $user = $request->user();
+        $farmIds = $user->farms()->pluck('id');
+        $deviceUuids = IotDevice::whereIn('farm_id', $farmIds)->pluck('uuid');
+
+        $query = ActuatorCommand::with(['iotDevice.farm'])->whereIn('uuid', $deviceUuids);
+
+        $commands = $query->latest()->paginate(50);
+
+        return response()->json(['status' => 'success', 'data' => $commands]);
     }
 
     /**
@@ -24,6 +42,8 @@ class ActuatorCommandController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', ActuatorCommand::class);
+
         $validator = Validator::make($request->all(), [
             'uuid' => 'required|string|max:45|exists:iot_devices,uuid',
             'auto_rule_id' => 'nullable|integer|exists:auto_rules,id',
@@ -40,10 +60,25 @@ class ActuatorCommandController extends Controller
             ], 422);
         }
 
+        $device = IotDevice::where('uuid', $request->uuid)->firstOrFail();
+        $this->authorize('update', $device); // Issuing a command is an update-like action on the device.
+
         $actuatorCommand = ActuatorCommand::create($validator->validated());
+
+        // --- Start of Automatic Logging ---
+        ActivityLog::create([
+            'user_id'      => $request->user()->id,
+            'action'       => 'created_actuator_command',
+            'subject_id'   => $actuatorCommand->id,
+            'subject_type' => get_class($actuatorCommand),
+            'description'  => "User '{$request->user()->username}' created a command for device '{$device->uuid}'.",
+            'after'        => $actuatorCommand->toArray()
+        ]);
+        // --- End of Automatic Logging ---
 
         return response()->json([
             'status' => 'success',
+            'message' => 'Actuator command created successfully.',
             'data' => $actuatorCommand->load('iotDevice'),
         ], 201);
     }
@@ -53,9 +88,11 @@ class ActuatorCommandController extends Controller
      */
     public function show(ActuatorCommand $actuatorCommand)
     {
+        $this->authorize('view', $actuatorCommand);
+
         return response()->json([
             'status' => 'success',
-            'data' => $actuatorCommand->load('iotDevice'),
+            'data' => $actuatorCommand->load('iotDevice.farm'),
         ]);
     }
 
@@ -64,28 +101,12 @@ class ActuatorCommandController extends Controller
      */
     public function update(Request $request, ActuatorCommand $actuatorCommand)
     {
-        $validator = Validator::make($request->all(), [
-            'uuid' => 'sometimes|required|string|max:45|exists:iot_devices,uuid',
-            'auto_rule_id' => 'nullable|integer|exists:auto_rules,id',
-            'actuator_prefix' => 'nullable|string|max:50',
-            'pin' => 'nullable|integer',
-            'val' => 'nullable|string|max:50',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $actuatorCommand->update($validator->validated());
+        $this->authorize('update', $actuatorCommand);
 
         return response()->json([
-            'status' => 'success',
-            'data' => $actuatorCommand->load('iotDevice'),
-        ]);
+            'status' => 'error',
+            'message' => 'Update operation is not supported for actuator commands.'
+        ], 405);
     }
 
     /**
@@ -93,11 +114,12 @@ class ActuatorCommandController extends Controller
      */
     public function destroy(ActuatorCommand $actuatorCommand)
     {
-        $actuatorCommand->delete();
-
+        $this->authorize('delete', $actuatorCommand);
+        
+        // Policy prevents this, but as a safeguard:
         return response()->json([
-            'status' => 'success',
-            'message' => 'ActuatorCommand soft deleted successfully',
-        ], 200);
+            'status' => 'error',
+            'message' => 'Delete operation is not supported for actuator commands.'
+        ], 405);
     }
 }
