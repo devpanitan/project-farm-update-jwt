@@ -2,38 +2,26 @@
 
 ## 1. Overview
 
-This project is a full-stack web application for a Smart Farm system, built with Laravel. It's designed to manage users, farms, IoT devices, and sensor data, providing a platform for monitoring and controlling agricultural environments.
+This project is a full-stack web application built with the Laravel framework. It is designed to be developed within the Firebase Studio environment and includes features for user authentication via JWT and real-time communication capabilities using MQTT.
 
 ## 2. Implemented Features & Design
 
-### Backend (Laravel API)
+*   **Framework:** Laravel
+*   **Frontend:** Blade templates with Vite for asset bundling (CSS, JS).
+*   **Authentication:** JWT-based authentication.
+*   **Real-time:** MQTT integration for real-time features.
+*   **Database:** MySQL.
+*   **Styling:** Standard Laravel styles.
 
-*   **Authentication:** JWT-based authentication for securing API endpoints.
-*   **User Management:** CRUD operations for users.
-*   **Farm Management:** CRUD operations for farms and farm categories.
-*   **IoT Device Management:** CRUD operations for IoT devices.
-*   **Sensor Data:** Handling and storage of sensor data.
-*   **Automation:** Rules-based automation for controlling actuators.
-*   **Real-time Communication:** MQTT integration for real-time device communication.
-*   **Logging:** Activity logging for tracking user actions.
-*   **API Structure:**
-    *   Public routes for authentication (`/api/auth/*`).
-    *   Protected routes for all other resources, requiring `auth:api` middleware.
+## 3. Current Task: Resolving Critical Errors
 
-### Frontend
+The application is currently facing a series of critical errors preventing it from running correctly in the production/preview environment.
 
-*   _Not yet implemented._
+**Plan & Steps:**
 
-### Design
+The root cause of all issues has been identified as an incorrect and incomplete `.env` configuration file. The following steps will be executed to fix the application:
 
-*   _Not yet implemented._
-
-## 3. Current Plan
-
-*   **Secure API Routes:** Group all relevant API endpoints under the `auth:api` middleware to ensure data is protected and accessible only by authenticated users. (Completed)
-*   **Standardize Activity Log Routes:** Refactor the `ActivityLogController` routes to use `apiResource` for consistency with other controllers. (Completed)
-*   **Develop Frontend UI:** Create a user interface to interact with the backend API.
-*   **Database Seeding:** Populate the database with initial data for development and testing.
-
----
-*This document is automatically generated and updated by Gemini AI to reflect the current state of the project.*
+1.  **Update `APP_URL`:** The `APP_URL` in the `.env` file will be changed from `http://localhost` to the correct public HTTPS URL of the preview environment. This will resolve the "Mixed Content" errors.
+2.  **Generate `APP_KEY`:** The `php artisan key:generate` command will be run to create a secure application key, which is essential for encryption and session security.
+3.  **Generate `JWT_SECRET`:** The `php artisan jwt:secret` command will be run to create a secure secret for JWT signing.
+4.  **Clear Configuration Cache:** The `php artisan config:clear` command will be executed to ensure all parts of the application load the new, corrected configuration from the `.env` file.

@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\FarmController;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,9 +13,25 @@ use App\Http\Controllers\FarmController;
 |
 */
 
-// When the root URL is accessed, use the 'index' method of FarmController
-Route::get('/', [FarmController::class, 'index']);
+// Publicly accessible routes
+Route::get('/', function () {
+    return view('welcome');
+});
 
+Route::get('/login', function () {
+    return view('auth.login');
+})->name('login'); // Naming the route for easy URL generation
+
+Route::get('/register', function () {
+    return view('auth.register');
+})->name('register');
+
+// Route for the main dashboard, protected by client-side script
+Route::get('/dashboard', function () {
+    return view('dashboard');
+})->name('dashboard');
+
+// Database connection test route (for debugging)
 Route::get('/test-db', function () {
     try {
         \Illuminate\Support\Facades\DB::connection()->getPdo();

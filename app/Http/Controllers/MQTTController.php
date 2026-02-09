@@ -15,6 +15,37 @@ class MQTTController extends Controller
         $this->middleware('auth:api');
     }
 
+    /**
+     * Provides the necessary credentials for the frontend MQTT client.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCredentials(Request $request)
+    {
+        try {
+            // Important: Ensure these config keys match your config/mqtt.php file
+            $credentials = [
+                'host'      => config('mqtt.connections.default.host'),
+                'port'      => (int) config('mqtt.connections.default.port', 1883),
+                'username'  => config('mqtt.connections.default.auth.username'),
+                'password'  => config('mqtt.connections.default.auth.password'),
+                'clientId'  => 'frontend-' . auth()->id() . '-' . uniqid(), // Create a unique and identifiable client ID
+                'useTls'    => config('mqtt.connections.default.tls.enabled', false),
+            ];
+
+            return response()->json(['status' => 'success', 'credentials' => $credentials]);
+
+        } catch (\Exception $e) {
+            Log::error("Failed to retrieve MQTT credentials: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Could not retrieve MQTT credentials.'
+            ], 500);
+        }
+    }
+
+
     public function publishMessage(Request $request)
     {
         $request->validate([
