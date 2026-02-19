@@ -19,7 +19,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://3000-firebase-frontend-farm-1771430320872.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev'],
+    'allowed_origins' => [
+        'https://3000-firebase-frontend-farm-1771430320872.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev',
+        'http://localhost:3000'
+    ],
 
     'allowed_origins_patterns' => [],
 

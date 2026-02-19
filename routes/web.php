@@ -13,21 +13,24 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Publicly accessible routes
+// The root path now returns a JSON response indicating the API is running.
 Route::get('/', function () {
-    return view('welcome');
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Welcome to the Smart Farm API. The API is running correctly.'
+    ]);
 });
 
+// The following web view routes are commented out as this is an API-only project.
+/*
 Route::get('/login', function () {
     return view('auth.login');
-})->name('login'); // Naming the route for easy URL generation
+})->name('login');
 
-// The conflicting GET /register route has been removed to prevent conflicts with the API.
-
-// Route for the main dashboard, protected by client-side script
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->name('dashboard');
+*/
 
 // Database connection test route (for debugging)
 Route::get('/test-db', function () {

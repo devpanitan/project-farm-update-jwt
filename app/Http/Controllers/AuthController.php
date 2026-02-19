@@ -35,15 +35,15 @@ class AuthController extends Controller
         $validatedData = $request->validate([
             'name' => 'required|string|between:2,100',
             'email' => 'required|string|email|max:100|unique:users',
-            'password' => 'required|string|confirmed|min:6',
+            'password' => 'required|string|min:6',
         ]);
 
         // If validation passes, create the user.
         $user = User::create([
-            'username' => $validatedData['name'], // Use validated data
+            'name' => $validatedData['name'],
             'email' => $validatedData['email'],
             'password' => Hash::make($validatedData['password']),
-            'user_role_id' => 2, // Default user role
+            'user_role_id' => 2, // Re-enabled
         ]);
 
         // Return a success response.
