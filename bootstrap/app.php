@@ -19,13 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Trust all proxies using the correct positional argument syntax.
         $middleware->trustProxies('*');
 
-        $middleware->web(prepend: [
-            \App\Http\Middleware\Cors::class,
-        ]);
+        // NOTE: The problematic custom CORS middleware that was manually added here
+        // has been removed. Laravel will now use its default CORS handling
+        // which correctly reads the settings from 'config/cors.php'.
 
-        $middleware->api(prepend: [
-            \App\Http\Middleware\Cors::class,
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

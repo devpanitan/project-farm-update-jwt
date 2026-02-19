@@ -22,9 +22,7 @@ Route::get('/login', function () {
     return view('auth.login');
 })->name('login'); // Naming the route for easy URL generation
 
-Route::get('/register', function () {
-    return view('auth.register');
-})->name('register');
+// The conflicting GET /register route has been removed to prevent conflicts with the API.
 
 // Route for the main dashboard, protected by client-side script
 Route::get('/dashboard', function () {

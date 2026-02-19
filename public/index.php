@@ -1,4 +1,6 @@
 <?php
+$log_data = date('Y-m-d H:i:s') . " - " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI'] . "\n";
+file_put_contents(__DIR__.'/../storage/logs/request_log.txt', $log_data, FILE_APPEND);
 
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;

@@ -28,27 +28,46 @@ use App\Http\Controllers\Api\ActivityLogController;
 |
 */
 
-// Authentication routes (Public)
+// Health check route for debugging
+Route::get('/health', function (Request $request) {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'Backend is running correctly!',
+        'timestamp' => now()
+    ]);
+});
+
+//======================================================================
+// PUBLIC ROUTES
+// - These routes are accessible without authentication.
+// - Used for user registration and login.
+//======================================================================
 Route::group([
     'middleware' => 'api',
     'prefix' => 'auth'
 ], function ($router) {
-    Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register']);
-    Route::post('logout', [AuthController::class, 'logout']);
-    Route::post('refresh', [AuthController::class, 'refresh']);
-    Route::post('me', [AuthController::class, 'me']);
+    Route::post('login', [AuthController::class, 'login']);
 });
 
-// Protected API routes (Requires Authentication)
-Route::group(['middleware' => 'auth:api'], function () {
+//======================================================================
+// PROTECTED ROUTES
+// - These routes require a valid authentication token.
+// - Protected by the 'auth:api' middleware.
+//======================================================================
+Route::group(['middleware' => ['auth:api']], function () {
 
+    // Auth-related protected routes
+    Route::group(['prefix' => 'auth'], function ($router) {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::post('refresh', [AuthController::class, 'refresh']);
+        Route::post('me', [AuthController::class, 'me']);
+    });
+
+    // User information
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
-    
-    // MQTT Credentials Route
-    Route::get('/mqtt/credentials', [MQTTController::class, 'getCredentials']);
 
     // Resource routes
     Route::apiResource('farm-categories', FarmCategoryController::class);

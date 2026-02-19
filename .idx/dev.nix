@@ -1,18 +1,21 @@
 { pkgs, ... }:
+{
+  # Add PHP and Node.js to the environment
+  packages = [
+    pkgs.php
+    pkgs.nodejs_20 # Using LTS version for better compatibility
+  ];
 
-{ 
-  # Pinned to a version that is compatible with the version of Vite used in the project
-  languages.nix.package = pkgs.nodejs_22;
-  
-  # The following are other examples of what you can configure in your dev environment.
-  #
-  # # To find more configuration options, visit https://devenv.sh/reference/options/
-  #
-  # # Processes to run when you enter the environment
-  # enterShell = ''
-  #   echo "Hello, world!"
-  # '''
-  #
-  # # Environment variables
-  # env.GREET = "Hello from the environment";
+  # Enable previews and customize configuration
+  idx.previews = {
+    enable = true;
+    previews = {
+      # This sets up the web preview
+      web = {
+        # This command starts the development servers
+        command = [ "npm" "run" "dev" ];
+        manager = "web";
+      };
+    };
+  };
 }
